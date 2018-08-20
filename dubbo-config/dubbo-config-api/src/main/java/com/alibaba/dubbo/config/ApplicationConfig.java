@@ -25,7 +25,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-
+/**
+ * ApplicationConfig
+ *
+ * 应用配置
+ * 属性参见 https://dubbo.gitbooks.io/dubbo-user-book/references/xml/dubbo-application.html
+ * @export
+ */
 /**
  * ApplicationConfig
  *

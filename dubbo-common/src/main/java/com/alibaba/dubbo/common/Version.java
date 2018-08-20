@@ -120,7 +120,7 @@ public final class Version {
             return false;
         }
     }
-
+   //获得版本号
     public static String getVersion(Class<?> cls, String defaultVersion) {
         try {
             // find version info from MANIFEST.MF first
