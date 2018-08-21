@@ -199,7 +199,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         //拼接属性配置（环境变量 + properties 属性）到 ConsumerConfig 对象
         checkDefault();
         appendProperties(this);
-        // 若未设置 `generic` 属性，使用 `ConsumerConfig.generic` 属性。
+        // 若未设置 `generic` 属性（序列号属性，取默认的javassist），使用 `ConsumerConfig.generic` 属性。
         if (getGeneric() == null && getConsumer() != null) {
             setGeneric(getConsumer().getGeneric());
         }
@@ -261,6 +261,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 }
             }
         }
+        // 从 ConsumerConfig 对象中，读取 application、module、registries、monitor 配置对象。
         if (consumer != null) {
             if (application == null) {
                 application = consumer.getApplication();
@@ -275,6 +276,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 monitor = consumer.getMonitor();
             }
         }
+        //从moduleConfig 对象中 读取 registries 、monitor 配置对象
         if (module != null) {
             if (registries == null) {
                 registries = module.getRegistries();
@@ -283,6 +285,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 monitor = module.getMonitor();
             }
         }
+        //从 application 配置对象总，获取 registries 、monitor 配置对象
         if (application != null) {
             if (registries == null) {
                 registries = application.getRegistries();
@@ -291,8 +294,11 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 monitor = application.getMonitor();
             }
         }
+        //校验 ApplicationConfig 配置。
         checkApplication();
+        // 校验 Stub 和 Mock 相关的配置
         checkStubAndMock(interfaceClass);
+       // 将 `side`，`dubbo`，`timestamp`，`pid` 参数，添加到 `map` 集合中。
         Map<String, String> map = new HashMap<String, String>();
         Map<Object, Object> attributes = new HashMap<Object, Object>();
         map.put(Constants.SIDE_KEY, Constants.CONSUMER_SIDE);
@@ -301,6 +307,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         if (ConfigUtils.getPid() > 0) {
             map.put(Constants.PID_KEY, String.valueOf(ConfigUtils.getPid()));
         }
+        // methods、revision、interface
         if (!isGeneric()) {
             String revision = Version.getVersion(interfaceClass, version);
             if (revision != null && revision.length() > 0) {
@@ -315,15 +322,20 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 map.put("methods", StringUtils.join(new HashSet<String>(Arrays.asList(methods)), ","));
             }
         }
+        // 将各种配置对象，添加到 `map` 集合中。
         map.put(Constants.INTERFACE_KEY, interfaceName);
         appendParameters(map, application);
         appendParameters(map, module);
         appendParameters(map, consumer, Constants.DEFAULT_KEY);
         appendParameters(map, this);
+        // 获得服务键，作为前缀
         String prefix = StringUtils.getServiceKey(map);
+        //334-351 目的是将每个 MethodConfig 和其对应的 ArgumentConfig 对象数组，添加到 map 中。
         if (methods != null && !methods.isEmpty()) {
             for (MethodConfig method : methods) {
+                // 将 MethodConfig 对象，添加到 `map` 集合中。
                 appendParameters(map, method, method.getName());
+                // 当 配置了 `MethodConfig.retry = false` 时，强制禁用重试
                 String retryKey = method.getName() + ".retry";
                 if (map.containsKey(retryKey)) {
                     String retryValue = map.remove(retryKey);
@@ -331,17 +343,20 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                         map.put(method.getName() + ".retries", "0");
                     }
                 }
+                // 将带有 @Parameter(attribute = true) 配置对象的属性，添加到参数集合。参见《事件通知》https://dubbo.gitbooks.io/dubbo-user-book/demos/events-notify.html
                 appendAttributes(attributes, method, prefix + "." + method.getName());
+                // 检查属性集合中的事件通知方法是否正确。若正确，进行转换。
                 checkAndConvertImplicitConfig(method, map, attributes);
             }
         }
-
+        // 以系统环境变量( DUBBO_IP_TO_REGISTRY ) 作为服务注册地址，参见 https://github.com/dubbo/dubbo-docker-sample 项目。
         String hostToRegistry = ConfigUtils.getSystemProperty(Constants.DUBBO_IP_TO_REGISTRY);
         if (hostToRegistry == null || hostToRegistry.length() == 0) {
             hostToRegistry = NetUtils.getLocalHost();
         } else if (isInvalidLocalHost(hostToRegistry)) {
             throw new IllegalArgumentException("Specified invalid registry ip from property:" + Constants.DUBBO_IP_TO_REGISTRY + ", value:" + hostToRegistry);
         }
+        //注册地址放入到map集合中
         map.put(Constants.REGISTER_IP_KEY, hostToRegistry);
 
         //attributes are stored by system context.
